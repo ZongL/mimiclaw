@@ -22,7 +22,7 @@ jobs:
             bootloader_offset: 0x0
             partition_offset: 0x8000
             otainitial_offset: 0xf000
-            appbin_offset: 0x10000
+            appbin_offset: 0x11000
 
     steps:
       - name: Checkout
@@ -98,7 +98,7 @@ jobs:
               0x0     bootloader-esp32cam-${{ github.ref_name }}.bin \
               0x8000  partition-table-esp32cam-${{ github.ref_name }}.bin \
               0xf000  ota_data_initial-esp32cam-${{ github.ref_name }}.bin \
-              0x10000 mimiclaw-esp32cam-${{ github.ref_name }}.bin
+              0x11000 mimiclaw-esp32cam-${{ github.ref_name }}.bin
             ```
 
             ---
