@@ -20,9 +20,9 @@ jobs:
             flash_size: 4MB
             flash_freq: 40m
             bootloader_offset: 0x0
-            bin_offset: 0x10000
-            partition_offset: 0x9000
-            ota_offset: 0xf000
+            partition_offset: 0x8000
+            otainitial_offset: 0xf000
+            appbin_offset: 0x10000
 
     steps:
       - name: Checkout
@@ -33,6 +33,9 @@ jobs:
         run: |
           . $IDF_PATH/export.sh
           idf.py set-target ${{ matrix.target.chip }}
+
+          # Clean build to ensure new partition table is used
+          idf.py fullclean
 
           # Use target-specific config if exists
           if [ -f "sdkconfig.defaults.${{ matrix.target.name }}" ]; then
@@ -56,8 +59,8 @@ jobs:
             -o "mimiclaw-${TARGET}-full-${VERSION}.bin" \
             ${{ matrix.target.bootloader_offset }}     build/bootloader/bootloader.bin \
             ${{ matrix.target.partition_offset }}  build/partition_table/partition-table.bin \
-            ${{ matrix.target.ota_offset }}  build/ota_data_initial.bin \
-            ${{ matrix.target.bin_offset }} build/mimiclaw.bin
+            ${{ matrix.target.otainitial_offset }}  build/ota_data_initial.bin \
+            ${{ matrix.target.appbin_offset }} build/mimiclaw.bin
 
           # Copy individual binaries with version suffix
           cp build/mimiclaw.bin              "mimiclaw-${TARGET}-${VERSION}.bin"
@@ -101,7 +104,7 @@ jobs:
             ```bash
             esptool.py --chip esp32 -b 460800 write_flash \
               0x0     bootloader-esp32cam-${{ github.ref_name }}.bin \
-              0x9000  partition-table-esp32cam-${{ github.ref_name }}.bin \
+              0x8000  partition-table-esp32cam-${{ github.ref_name }}.bin \
               0xf000  ota_data_initial-esp32cam-${{ github.ref_name }}.bin \
               0x10000 mimiclaw-esp32cam-${{ github.ref_name }}.bin
             ```
