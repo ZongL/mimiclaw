@@ -34,11 +34,6 @@ jobs:
           . $IDF_PATH/export.sh
           idf.py set-target ${{ matrix.target.chip }}
 
-          # Use target-specific config if exists
-          if [ -f "sdkconfig.defaults.${{ matrix.target.name }}" ]; then
-            cp sdkconfig.defaults.${{ matrix.target.name }} sdkconfig.defaults
-          fi
-
           idf.py build
 
       - name: Prepare release artifacts for ${{ matrix.target.name }}
