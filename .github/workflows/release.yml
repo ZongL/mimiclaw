@@ -14,15 +14,6 @@ jobs:
     strategy:
       matrix:
         target:
-          - name: esp32s3
-            chip: esp32s3
-            flash_mode: qio
-            flash_size: 16MB
-            flash_freq: 80m
-            bootloader_offset: 0x0
-            bin_offset: 0x20000
-            partition_offset: 0x8000
-            ota_offset: 0xf000
           - name: esp32cam
             chip: esp32
             flash_mode: qio
@@ -93,38 +84,11 @@ jobs:
           body: |
             ## Flashing Guide
 
-            This release includes firmware for two targets:
-
-            - **ESP32-S3** - Xiaozhi AI board (16MB flash, 8MB PSRAM)
-            - **ESP32-CAM** - ESP32-CAM board (4MB flash, 4MB PSRAM)
+            This release includes firmware for **ESP32-CAM** (4MB flash, 4MB PSRAM).
 
             ---
 
-            ## ESP32-S3 (Xiaozhi AI Board)
-
-            ### Merged firmware (easiest)
-
-            Download `mimiclaw-esp32s3-full-${{ github.ref_name }}.bin` and flash:
-
-            ```bash
-            esptool.py --chip esp32s3 -b 460800 write_flash 0x0 mimiclaw-esp32s3-full-${{ github.ref_name }}.bin
-            ```
-
-            ### Individual binaries (advanced)
-
-            ```bash
-            esptool.py --chip esp32s3 -b 460800 write_flash \
-              0x0     bootloader-esp32s3-${{ github.ref_name }}.bin \
-              0x8000  partition-table-esp32s3-${{ github.ref_name }}.bin \
-              0xf000  ota_data_initial-esp32s3-${{ github.ref_name }}.bin \
-              0x20000 mimiclaw-esp32s3-${{ github.ref_name }}.bin
-            ```
-
-            ---
-
-            ## ESP32-CAM
-
-            ### Merged firmware (easiest)
+            ## Merged firmware (easiest)
 
             Download `mimiclaw-esp32cam-full-${{ github.ref_name }}.bin` and flash:
 
@@ -132,7 +96,7 @@ jobs:
             esptool.py --chip esp32 -b 460800 write_flash 0x0 mimiclaw-esp32cam-full-${{ github.ref_name }}.bin
             ```
 
-            ### Individual binaries (advanced)
+            ## Individual binaries (advanced)
 
             ```bash
             esptool.py --chip esp32 -b 460800 write_flash \
@@ -146,9 +110,7 @@ jobs:
 
             ## OTA Update (for devices already running MimiClaw)
 
-            Upload the firmware bin file via the OTA endpoint:
-            - ESP32-S3: `mimiclaw-esp32s3-${{ github.ref_name }}.bin`
-            - ESP32-CAM: `mimiclaw-esp32cam-${{ github.ref_name }}.bin`
+            Upload `mimiclaw-esp32cam-${{ github.ref_name }}.bin` via the OTA endpoint.
 
             ## First-time setup
 
@@ -161,12 +123,6 @@ jobs:
             mimi> restart
             ```
           files: |
-            # ESP32-S3 (Xiaozhi AI board)
-            mimiclaw-esp32s3-full-${{ github.ref_name }}.bin
-            mimiclaw-esp32s3-${{ github.ref_name }}.bin
-            bootloader-esp32s3-${{ github.ref_name }}.bin
-            partition-table-esp32s3-${{ github.ref_name }}.bin
-            ota_data_initial-esp32s3-${{ github.ref_name }}.bin
             # ESP32-CAM
             mimiclaw-esp32cam-full-${{ github.ref_name }}.bin
             mimiclaw-esp32cam-${{ github.ref_name }}.bin
