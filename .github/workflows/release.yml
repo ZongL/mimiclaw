@@ -34,12 +34,9 @@ jobs:
           . $IDF_PATH/export.sh
           idf.py set-target ${{ matrix.target.chip }}
 
-          # Clean build to ensure new partition table is used
-          idf.py fullclean
-
           # Use target-specific config if exists
           if [ -f "sdkconfig.defaults.${{ matrix.target.name }}" ]; then
-            echo "Using sdkconfig.defaults.${{ matrix.target.name }}"
+            cp sdkconfig.defaults.${{ matrix.target.name }} sdkconfig.defaults
           fi
 
           idf.py build
