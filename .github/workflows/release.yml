@@ -16,7 +16,7 @@ jobs:
         target:
           - name: esp32cam
             chip: esp32
-            flash_mode: qio
+            flash_mode: dio
             flash_size: 4MB
             flash_freq: 40m
             bootloader_offset: 0x1000
