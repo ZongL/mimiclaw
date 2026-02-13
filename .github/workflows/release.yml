@@ -19,7 +19,7 @@ jobs:
             flash_mode: qio
             flash_size: 4MB
             flash_freq: 40m
-            bootloader_offset: 0x0
+            bootloader_offset: 0x1000
             partition_offset: 0x8000
             otainitial_offset: 0xe000
             appbin_offset: 0x10000
@@ -95,7 +95,7 @@ jobs:
 
             ```bash
             esptool.py --chip esp32 -b 460800 write_flash \
-              0x0     bootloader-esp32cam-${{ github.ref_name }}.bin \
+              0x1000     bootloader-esp32cam-${{ github.ref_name }}.bin \
               0x8000  partition-table-esp32cam-${{ github.ref_name }}.bin \
               0xe000  ota_data_initial-esp32cam-${{ github.ref_name }}.bin \
               0x10000 mimiclaw-esp32cam-${{ github.ref_name }}.bin
