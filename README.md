@@ -5,7 +5,7 @@
 [![Discord](https://img.shields.io/badge/Discord-mimiclaw-5865F2?logo=discord&logoColor=white)](https://discord.gg/r8ZxSvB8Yr)
 [![X](https://img.shields.io/badge/X-@ssslvky-black?logo=x)](https://x.com/ssslvky)
 
-**[English](README.md) | [中文](README_CN.md)**
+**[English](README.md) | [中文](README_CN.md) | [日本語](README_JA.md)**
 
 <p align="center">
   <img src="assets/banner.png" alt="MimiClaw" width="480" />
@@ -27,7 +27,7 @@ MimiClaw turns a tiny ESP32-S3 board into a personal AI assistant. Plug it into 
 
 ![](assets/mimiclaw.png)
 
-You send a message on Telegram. The ESP32-S3 picks it up over WiFi, feeds it into an agent loop — Claude thinks, calls tools, reads memory — and sends the reply back. Everything runs on a single $5 chip with all your data stored locally on flash.
+You send a message on Telegram. The ESP32-S3 picks it up over WiFi, feeds it into an agent loop — the LLM thinks, calls tools, reads memory — and sends the reply back. Supports both **Anthropic (Claude)** and **OpenAI (GPT)** as providers, switchable at runtime. Everything runs on a single $5 chip with all your data stored locally on flash.
 
 ## Quick Start
 
@@ -36,7 +36,7 @@ You send a message on Telegram. The ESP32-S3 picks it up over WiFi, feeds it int
 - An **ESP32-S3 dev board** with 16 MB flash and 8 MB PSRAM (e.g. Xiaozhi AI board, ~$10)
 - A **USB Type-C cable**
 - A **Telegram bot token** — talk to [@BotFather](https://t.me/BotFather) on Telegram to create one
-- An **Anthropic API key** — from [console.anthropic.com](https://console.anthropic.com)
+- An **Anthropic API key** — from [console.anthropic.com](https://console.anthropic.com), or an **OpenAI API key** — from [platform.openai.com](https://platform.openai.com)
 
 ### Install
 
@@ -65,6 +65,7 @@ Edit `main/mimi_secrets.h`:
 #define MIMI_SECRET_WIFI_PASS       "YourWiFiPassword"
 #define MIMI_SECRET_TG_TOKEN        "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
 #define MIMI_SECRET_API_KEY         "sk-ant-api03-xxxxx"
+#define MIMI_SECRET_MODEL_PROVIDER  "anthropic"     // "anthropic" or "openai"
 #define MIMI_SECRET_SEARCH_KEY      ""              // optional: Brave Search API key
 #define MIMI_SECRET_PROXY_HOST      ""              // optional: e.g. "10.0.0.1"
 #define MIMI_SECRET_PROXY_PORT      ""              // optional: e.g. "7897"
@@ -85,6 +86,15 @@ ls /dev/ttyACM*          # Linux
 idf.py -p PORT flash monitor
 ```
 
+> **Important: Plug into the correct USB port!** Most ESP32-S3 boards have two USB-C ports. You must use the one labeled **USB** (native USB Serial/JTAG), **not** the one labeled **COM** (external UART bridge). Plugging into the wrong port will cause flash/monitor failures.
+>
+> <details>
+> <summary>Show reference photo</summary>
+>
+> <img src="assets/esp32s3-usb-port.jpg" alt="Plug into the USB port, not COM" width="480" />
+>
+> </details>
+
 ### CLI Commands
 
 Connect via serial to configure or debug. **Config commands** let you change settings without recompiling — just plug in a USB cable anywhere.
@@ -94,8 +104,9 @@ Connect via serial to configure or debug. **Config commands** let you change set
 ```
 mimi> wifi_set MySSID MyPassword   # change WiFi network
 mimi> set_tg_token 123456:ABC...   # change Telegram bot token
-mimi> set_api_key sk-ant-api03-... # change Anthropic API key
-mimi> set_model claude-sonnet-4-5  # change LLM model
+mimi> set_api_key sk-ant-api03-... # change API key (Anthropic or OpenAI)
+mimi> set_model_provider openai    # switch provider (anthropic|openai)
+mimi> set_model gpt-4o             # change LLM model
 mimi> set_proxy 127.0.0.1 7897  # set HTTP proxy
 mimi> clear_proxy                  # remove proxy
 mimi> set_search_key BSA...        # set Brave Search API key
@@ -129,7 +140,7 @@ MimiClaw stores everything as plain text files you can read and edit:
 
 ## Tools
 
-MimiClaw uses Anthropic's tool use protocol — Claude can call tools during a conversation and loop until the task is done (ReAct pattern).
+MimiClaw supports tool calling for both Anthropic and OpenAI — the LLM can call tools during a conversation and loop until the task is done (ReAct pattern).
 
 | Tool | Description |
 |------|-------------|
@@ -144,7 +155,8 @@ To enable web search, set a [Brave Search API key](https://brave.com/search/api/
 - **OTA updates** — flash new firmware over WiFi, no USB needed
 - **Dual-core** — network I/O and AI processing run on separate CPU cores
 - **HTTP proxy** — CONNECT tunnel support for restricted networks
-- **Tool use** — ReAct agent loop with Anthropic tool use protocol
+- **Multi-provider** — supports both Anthropic (Claude) and OpenAI (GPT), switchable at runtime
+- **Tool use** — ReAct agent loop with tool calling for both providers
 
 ## For Developers
 

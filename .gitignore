@@ -38,6 +38,10 @@ main/mimi_secrets.h
 # Reference repos
 nanobot/
 
+# MCP / Memov
+.mcp.json
+.mem/
+.memignore
 # OS
 .DS_Store
 Thumbs.db
