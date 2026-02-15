@@ -7,16 +7,6 @@
 #include "esp_log.h"
 #include "esp_http_server.h"
 #include "cJSON.h"
-#include "soc/soc_caps.h"
-
-/* Check if WebSocket support is available */
-#ifdef CONFIG_HTTPD_WS_SUPPORT
-    #define WS_SUPPORT_ENABLED 1
-#else
-    #define WS_SUPPORT_ENABLED 0
-#endif
-
-/* is_websocket field is available in ESP-IDF v5.x+ with CONFIG_HTTPD_WS_SUPPORT */
 
 static const char *TAG = "ws";
 
@@ -79,7 +69,6 @@ static void remove_client(int fd)
 
 static esp_err_t ws_handler(httpd_req_t *req)
 {
-#if WS_SUPPORT_ENABLED
     if (req->method == HTTP_GET) {
         /* WebSocket handshake — register client */
         int fd = httpd_req_to_sockfd(req);
@@ -148,15 +137,11 @@ static esp_err_t ws_handler(httpd_req_t *req)
     }
 
     cJSON_Delete(root);
-#else
-    ESP_LOGW(TAG, "WebSocket support not enabled in IDF config");
-#endif
     return ESP_OK;
 }
 
 esp_err_t ws_server_start(void)
 {
-#if WS_SUPPORT_ENABLED
     memset(s_clients, 0, sizeof(s_clients));
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
@@ -175,22 +160,16 @@ esp_err_t ws_server_start(void)
         .uri = "/",
         .method = HTTP_GET,
         .handler = ws_handler,
-        .user_ctx = NULL,
         .is_websocket = true,
     };
     httpd_register_uri_handler(s_server, &ws_uri);
 
     ESP_LOGI(TAG, "WebSocket server started on port %d", MIMI_WS_PORT);
-#else
-    ESP_LOGW(TAG, "WebSocket support not enabled, skipping server start");
-    ESP_LOGW(TAG, "Enable CONFIG_HTTPD_WS_SUPPORT in sdkconfig to use WebSocket");
-#endif
     return ESP_OK;
 }
 
 esp_err_t ws_server_send(const char *chat_id, const char *text)
 {
-#if WS_SUPPORT_ENABLED
     if (!s_server) return ESP_ERR_INVALID_STATE;
 
     ws_client_t *client = find_client_by_chat_id(chat_id);
@@ -225,11 +204,6 @@ esp_err_t ws_server_send(const char *chat_id, const char *text)
     }
 
     return ret;
-#else
-    (void)chat_id;
-    (void)text;
-    return ESP_ERR_NOT_SUPPORTED;
-#endif
 }
 
 esp_err_t ws_server_stop(void)
