@@ -17,7 +17,7 @@
 #include "nvs_flash.h"
 #include "nvs.h"
 #include "argtable3/argtable3.h"
-#include "soc/soc_caps.h"
+
 
 /* Support both ESP32 (UART) and ESP32-S3 (USB Serial JTAG) */
 #ifdef CONFIG_IDF_TARGET_ESP32S3
