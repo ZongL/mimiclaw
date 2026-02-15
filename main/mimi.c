@@ -124,7 +124,7 @@ void app_main(void)
             ESP_LOGI(TAG, "WiFi connected: %s", wifi_manager_get_ip());
 
             /* Start network-dependent services */
-            ESP_ERROR_CHECK(telegram_bot_start());
+            //ESP_ERROR_CHECK(telegram_bot_start());
             ESP_ERROR_CHECK(agent_loop_start());
             ESP_ERROR_CHECK(ws_server_start());
 
