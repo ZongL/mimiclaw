@@ -16,11 +16,7 @@
     #define WS_SUPPORT_ENABLED 0
 #endif
 
-/* ESP32 httpd_uri_t doesn't have is_websocket in older ESP-IDF versions */
-/* We use user_ctx to pass the websocket flag */
-struct user_ctx_data {
-    bool is_websocket;
-};
+/* is_websocket field is available in ESP-IDF v5.x+ with CONFIG_HTTPD_WS_SUPPORT */
 
 static const char *TAG = "ws";
 
@@ -175,13 +171,12 @@ esp_err_t ws_server_start(void)
     }
 
     /* Register WebSocket URI */
-    /* Use user_ctx to store websocket flag for compatibility */
-    static struct user_ctx_data ws_ctx = { .is_websocket = true };
     httpd_uri_t ws_uri = {
         .uri = "/",
         .method = HTTP_GET,
         .handler = ws_handler,
-        .user_ctx = &ws_ctx,
+        .user_ctx = NULL,
+        .is_websocket = true,
     };
     httpd_register_uri_handler(s_server, &ws_uri);
 
