@@ -250,6 +250,28 @@ App 运行（QIO 模式，如果硬件支持）
 这绕过了上述流程，导致 ROM 直接以 QIO 模式读取 flash。
 由于 ROM 没有执行 bootloader 的软件切换流程，flash 芯片无法正确响应 QIO 命令。
 
+### 罪魁祸首：一个字节的差异
+
+通过二进制对比 QIO 和 DIO 的 merged bin，发现差异仅在 **offset 0x1002** 的一个字节：
+
+```
+ESP Image Header（位于 merged bin 的 0x1000，即 bootloader 起始位置）
+
+偏移      含义              QIO 值    DIO 值
+0x1000    Magic             0xE9      0xE9      (不变)
+0x1001    Segment count     0x03      0x03      (不变)
+0x1002    Flash mode        0x00      0x02      ← 唯一变化
+0x1003    Flash size+freq   ...       ...       (不变)
+
+Flash mode 编码：0x00=QIO, 0x01=QOUT, 0x02=DIO, 0x03=DOUT
+```
+
+ESP-IDF 编译出的 bootloader.bin 头部是 `E9 03 02`（DIO），
+但 `merge_bin --flash_mode qio` 把 `0x02` 改写成了 `0x00`（QIO）。
+
+ROM 读到 `0x00` 就直接用 QIO 模式访问 flash，前几 KB 能读对，
+之后返回垃圾数据，导致无限 boot loop。
+
 ### 最终修复
 
 将 `release.yml` 中 `merge_bin` 的 `flash_mode` 改为 `dio`，保持与编译产物一致：
