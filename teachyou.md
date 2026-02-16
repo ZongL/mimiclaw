@@ -227,22 +227,79 @@ CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
 
 但 `esptool image_info` 显示编译出的 bootloader.bin 和 mimiclaw.bin 头部都是 **DIO**。
 
-这是 ESP-IDF 的正常行为：ESP32 的 ROM 不支持直接以 QIO 启动，因此 ESP-IDF 编译时**自动将 bin 头部降级为 DIO**。实际的 QIO 切换在 bootloader 运行后通过软件完成。
+这**不是**配置没生效，而是 ESP-IDF **故意为之**。
+
+### 根本原因：Kconfig 中的强制映射
+
+ESP-IDF 的 `components/esptool_py/Kconfig.projbuild` 中定义了两个独立的配置项：
+
+1. `CONFIG_ESPTOOLPY_FLASHMODE_QIO` — bool，用户在 menuconfig 中选择的意图
+2. `CONFIG_ESPTOOLPY_FLASHMODE` — string，实际传给 esptool 写入 bin 头部的值
+
+关键映射如下：
+
+```kconfig
+config ESPTOOLPY_FLASHMODE
+    string
+    default "dio" if ESPTOOLPY_FLASHMODE_QIO     # ← QIO 映射为 "dio"
+    default "dio" if ESPTOOLPY_FLASHMODE_QOUT    # ← QOUT 映射为 "dio"
+    default "dio" if ESPTOOLPY_FLASHMODE_DIO
+    default "dout" if ESPTOOLPY_FLASHMODE_DOUT
+```
+
+**QIO、QOUT、DIO 三种模式全部映射为 `"dio"`**，只有 DOUT 映射为 `"dout"`。
+
+因此编译生成的 sdkconfig 中会同时存在：
+```
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y       # 用户意图：运行时用 QIO
+CONFIG_ESPTOOLPY_FLASHMODE="dio"        # 实际写入 bin header 的值
+```
+
+这两行并不矛盾。
+
+### 为什么必须这样做：ESP32 ROM bootloader 的限制
+
+ESP32 ROM bootloader（烧录在芯片内部，不可修改）**只支持 DIO/DOUT 模式**读取 flash。
+
+如果 bin 头部写了 QIO (`0x00`)，ROM 会尝试以 QIO 模式读取 flash，但 ROM 不会发送 flash 芯片所需的 QIO 使能命令（写 QE bit 等），导致 flash 芯片无法正确响应 → 读到垃圾数据 → boot loop。
 
 ### ESP32 启动时的 flash mode 切换流程
 
 ```
-ROM 固件（芯片内置）
-  │  从 0x1000 读取 bootloader 头部 → Flash mode: DIO
+ROM 固件（芯片内置，不可修改）
+  │  从 0x1000 读取 bootloader 头部 → Flash mode byte = 0x02 (DIO)
   │  以 DIO 模式加载 bootloader 到内存
   ▼
-Bootloader 运行（DIO 模式）
-  │  检测 sdkconfig 中配置的 flash mode
-  │  如果配置了 QIO，通过软件切换 flash 到 QIO 模式
-  │  以（已切换的）模式加载 app
+ESP-IDF Second-stage Bootloader（运行在 RAM 中）
+  │  调用 bootloader_enable_qio_mode()
+  │  读取 flash 芯片 manufacturer ID
+  │  在已知芯片表中查找匹配项
+  │  发送芯片特定命令启用 QIO（设置 status register 的 QE bit）
+  │  重新配置 SPI 控制器为 QIO 读取模式
+  │  以 QIO 模式加载 app
   ▼
 App 运行（QIO 模式，如果硬件支持）
 ```
+
+### 如何验证 QIO 确实在运行时生效
+
+`esptool image_info` 看到 DIO 是正常的，要确认 QIO 实际生效，检查串口启动日志：
+
+```
+I (32) qio_mode: Enabling default flash chip QIO    ← bootloader 正在切换到 QIO
+I (36) boot.esp32: SPI Speed      : 40MHz
+I (40) boot.esp32: SPI Mode       : QIO              ← 确认 QIO 已生效
+...
+I (603) spi_flash: flash io: qio                     ← app 运行时也是 QIO
+```
+
+### 验证总结表
+
+| 查看方式 | 显示值 | 说明 |
+|---|---|---|
+| `esptool image_info *.bin` | `Flash mode: DIO` | 正常 — bin header 故意写 DIO |
+| 串口日志 `boot.esp32: SPI Mode` | `QIO` | 正常 — bootloader 运行时切换到 QIO |
+| 串口日志 `spi_flash: flash io` | `qio` | 正常 — app 以 QIO 模式访问 flash |
 
 ### merge_bin --flash_mode qio 为什么会破坏启动
 
