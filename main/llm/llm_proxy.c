@@ -656,7 +656,6 @@ esp_err_t llm_chat_tools(const char *system_prompt,
     }
 
     /* Parse full JSON response */
-    ESP_LOGI(TAG, "LLM Raw API response (%d bytes): %.*s", (int)rb.len, (int)rb.len, rb.data);
     cJSON *root = cJSON_Parse(rb.data);
     resp_buf_free(&rb);
 
