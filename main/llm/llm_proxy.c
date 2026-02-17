@@ -656,6 +656,7 @@ esp_err_t llm_chat_tools(const char *system_prompt,
     }
 
     /* Parse full JSON response */
+    ESP_LOGI(TAG, "LLM Raw API response (%d bytes): %.*s", (int)rb.len, (int)rb.len, rb.data);
     cJSON *root = cJSON_Parse(rb.data);
     resp_buf_free(&rb);
 
@@ -794,9 +795,6 @@ esp_err_t llm_chat_tools(const char *system_prompt,
     ESP_LOGI(TAG, "Response: %d bytes text, %d tool calls, stop=%s",
              (int)resp->text_len, resp->call_count,
              resp->tool_use ? "tool_use" : "end_turn");
-    if (resp->text && resp->text_len > 0) {
-        ESP_LOGI(TAG, "LLM reply: %.*s", (int)resp->text_len, resp->text);
-    }
 
     return ESP_OK;
 }
