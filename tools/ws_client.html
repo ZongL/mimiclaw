@@ -25,6 +25,11 @@
   .msg.system { background: transparent; align-self: center; color: #888; font-size: 12px; }
   .msg .label { font-size: 11px; color: #888; margin-bottom: 4px; }
   .msg .content-text { color: #a5d6a7; }
+  .tags { margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .tag { background: rgba(255,255,255,0.06); color: #ddd; padding: 4px 8px; border-radius: 999px; font-size: 11px; border: 1px solid rgba(255,255,255,0.03); }
+  .quick-phrases { display: flex; gap: 8px; align-items: center; margin-right: 8px; }
+  .quick-phrases button { background: transparent; border: 1px solid rgba(255,255,255,0.04); color: #fff; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size:13px; }
+  .quick-phrases button:hover { background: rgba(233,69,96,0.06); }
   .input-area { background: #16213e; padding: 12px 20px; border-top: 1px solid #0f3460; display: flex; gap: 10px; }
   .input-area textarea { flex: 1; background: #0f3460; border: 1px solid #533483; color: #fff; padding: 10px 14px; border-radius: 8px; font-size: 14px; font-family: inherit; resize: none; height: 44px; }
   .input-area textarea:focus { outline: none; border-color: #e94560; }
@@ -36,12 +41,16 @@
 <body>
   <div class="header">
     <h1>MimiClaw</h1>
-    <input type="text" id="url" value="ws://192.168.2.116:18789/" placeholder="ws://IP:PORT/">
+    <input type="text" id="url" value="ws://192.168.124.110:18789/" placeholder="ws://IP:PORT/">
     <button id="connectBtn" class="btn-connect" onclick="toggleConnection()">Connect</button>
     <span id="status" class="status disconnected">Disconnected</span>
   </div>
   <div class="messages" id="messages"></div>
   <div class="input-area">
+    <div class="quick-phrases" title="常用语">
+      <button onclick="sendQuick('Hi')">Hi</button>
+      <button onclick="sendQuick('你有哪些工具')">你有哪些工具</button>
+    </div>
     <textarea id="input" placeholder="Type a message and press Enter..." onkeydown="handleKey(event)" disabled></textarea>
     <button id="sendBtn" onclick="sendMessage()" disabled>Send</button>
   </div>
@@ -61,7 +70,13 @@ function addMsg(type, label, text, json) {
       delete meta.content;
       html += '<div class="content-text">' + escHtml(content) + '</div>';
       if (Object.keys(meta).length > 0) {
-        html += '<pre>' + escHtml(JSON.stringify(meta, null, 2)) + '</pre>';
+        html += '<div class="tags">';
+        Object.keys(meta).forEach(k => {
+          let v = meta[k];
+          try { v = typeof v === 'object' ? JSON.stringify(v) : String(v); } catch(e) { v = String(v); }
+          html += '<span class="tag">' + escHtml(k + ': ' + v) + '</span>';
+        });
+        html += '</div>';
       }
     } catch(e) {
       html += '<pre>' + escHtml(text) + '</pre>';
@@ -121,6 +136,19 @@ function sendMessage() {
   ws.send(payload);
   const now = new Date().toLocaleTimeString();
   addMsg('sent', 'Sent ' + now, payload, true);
+  input.value = '';
+}
+
+function sendQuick(text) {
+  if (!text || !ws || ws.readyState !== 1) return;
+  let payload = text;
+  try { JSON.parse(text); } catch(e) {
+    payload = JSON.stringify({ type: 'message', content: text });
+  }
+  ws.send(payload);
+  const now = new Date().toLocaleTimeString();
+  addMsg('sent', 'Sent ' + now, payload, true);
+  const input = document.getElementById('input');
   input.value = '';
 }
 
