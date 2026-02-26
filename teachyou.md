@@ -711,3 +711,104 @@ mimi>
 mimi>  
 mimi>  
 ```
+
+
+
+
+
+# LLM 与 Mimi 交互示例（工具调用：get_current_time）
+
+下面是一个从 Telegram 到 LLM 再回到 Telegram 的完整数据流示例，展示 `tools_json`、LLM 请求、LLM 的工具调用响应、agent 解析/执行以及最终回复。
+
+1) Telegram → Mimi (入站消息)
+```json
+{
+  "channel": "telegram",
+  "chat_id": "12345",
+  "content": "告知我现在几点"
+}
+```
+
+2) Mimi 提供给 LLM 的 `tools_json`（示例，仅列出 `get_current_time`）
+```json
+[
+  {
+    "name": "get_current_time",
+    "description": "Get the current date and time. Also sets the system clock.",
+    "input_schema": { "type": "object", "properties": {}, "required": [] }
+  }
+]
+```
+
+3) Mimi 发给 LLM 的请求体（非 OpenAI 风格示例）
+```json
+{
+  "system": "<system prompt>",
+  "messages": [
+    { "role": "user", "content": "告知我现在几点" }
+  ],
+  "tools": [ /* 如上 tools_json */ ]
+}
+```
+
+4) 示例：LLM 回应（请求调用工具）
+```json
+{
+  "stop_reason": "tool_use",
+  "content": [
+    {
+      "role": "assistant",
+      "content": [
+        { "type": "tool_use", "id": "call-1", "name": "get_current_time", "input": {} }
+      ]
+    }
+  ]
+}
+```
+
+5) `llm_proxy` 解析后得到的内部结构（概念化）
+```json
+{
+  "tool_use": true,
+  "call_count": 1,
+  "calls": [ { "id": "call-1", "name": "get_current_time", "input": "{}" } ],
+  "text": ""
+}
+```
+
+6) Mimi 执行工具并获得输出（来自 `tool_get_time_execute`）
+```text
+2026-02-25 10:00:00 PST (Wednesday)
+```
+
+7) Mimi 把工具结果作为 `tool_result` 插回消息流并送回 LLM
+```json
+{
+  "role": "user",
+  "content": [
+    { "type": "tool_result", "tool_use_id": "call-1", "content": "2026-02-25 10:00:00 PST (Wednesday)" }
+  ]
+}
+```
+
+8) LLM 基于工具结果生成最终回复
+```json
+{
+  "role": "assistant",
+  "content": [ { "type": "text", "text": "现在是 2026-02-25 10:00:00 PST (Wednesday)。" } ]
+}
+```
+
+9) Mimi 解析最终回复并发回 Telegram（出站消息）
+```json
+{
+  "channel": "telegram",
+  "chat_id": "12345",
+  "content": "现在是 2026-02-25 10:00:00 PST (Wednesday)。"
+}
+```
+
+说明要点：
+- `input_schema` 用于指导 LLM 如何构造 `input`，但运行时并不强制校验；
+- `llm_proxy` 对 LLM 输出有明确结构预期（如 `tool_use` block 或 OpenAI 的 `tool_calls`），不匹配时工具调用会被忽略或报错；
+- 工具实现（如 `tool_files.c` / `tool_get_time.c`）应自行对 `input` 做实际验证与处理。
