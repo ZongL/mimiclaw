@@ -812,3 +812,149 @@ mimi>
 - `input_schema` 用于指导 LLM 如何构造 `input`，但运行时并不强制校验；
 - `llm_proxy` 对 LLM 输出有明确结构预期（如 `tool_use` block 或 OpenAI 的 `tool_calls`），不匹配时工具调用会被忽略或报错；
 - 工具实现（如 `tool_files.c` / `tool_get_time.c`）应自行对 `input` 做实际验证与处理。
+
+---
+
+# OTA 固件更新调试经验
+
+## 问题现象
+
+从 GitHub releases 下载 OTA 固件时报错：
+```
+E (120399) HTTP_CLIENT: Out of buffer
+E (120399) esp_https_ota: Failed to open HTTP connection: ESP_FAIL
+E (120419) ota: OTA failed: ESP_FAIL
+OTA update failed: ESP_FAIL
+```
+
+## 根本原因分析
+
+**表面错误** `Out of buffer` 很容易误导人认为是 4KB buffer 不够，但实际根本原因是：
+
+1. **国内网络访问 GitHub 限制** — GitHub releases 在国内网络常常很慢或不稳定
+2. **HTTP 响应超时或断续** — 网络延迟导致连接失败，而不是 buffer 真的溢出
+3. **"Out of buffer"只是表征** — 这个错误通常表示 HTTP 握手或初始化失败，而不是下载数据本身填满了 buffer
+
+## 解决方案：本地 HTTP 服务器（推荐临时方案）
+
+### 步骤 1: 准备固件文件
+
+```bash
+# 方式 A: 从本地构建
+cd D:\00_web\mimiclaw
+idf.py build -p COM5
+# 输出文件: build/mimiclaw-esp32cam.bin
+
+# 方式 B: 从 GitHub releases 下载到本地
+python tools/ota_server.py
+```
+
+### 步骤 2: 启动 Python HTTP 服务器
+
+```bash
+cd build/
+python -m http.server 8000
+```
+
+服务器会输出：
+```
+Serving HTTP on 0.0.0.0 port 8000 (http://0.0.0.0:8000/) ...
+```
+
+### 步骤 3: 获取 PC IP 地址
+
+```bash
+ipconfig
+```
+
+找到你的 IPv4 地址，比如 `192.168.1.100`
+
+### 步骤 4: 在 ESP32 上执行 OTA
+
+```
+mimi> ota_update http://192.168.1.100:8000/mimiclaw-esp32cam.bin
+```
+
+## 自动化脚本：ota_server.py
+
+项目在 `tools/ota_server.py` 中提供了完全自动化的脚本，可以一键完成上述所有步骤：
+
+```bash
+python tools/ota_server.py
+```
+
+脚本会自动：
+1. ✅ 从 GitHub releases 下载固件（如果还没下载）
+2. ✅ 自动检测你的本地 IP 地址
+3. ✅ 启动 HTTP 服务器（端口 8000）
+4. ✅ 直接打印 ESP32 端可用的 OTA 命令
+
+输出示例：
+```
+==================================================
+OTA Server Setup
+==================================================
+
+Firmware location: D:\00_web\mimiclaw\build\mimiclaw-esp32cam-v0.2.19-test.bin
+Serving from: D:\00_web\mimiclaw\build
+Local IP: 192.168.124.6
+Port: 8000
+
+==================================================
+On ESP32, run this command:
+  ota_update http://192.168.124.6:8000/mimiclaw-esp32cam-v0.2.19-test.bin
+==================================================
+
+Starting HTTP server...
+Press Ctrl+C to stop
+```
+
+## 验证 OTA 更新成功
+
+ESP32 会输出类似日志：
+```
+I (xxx) esp_https_ota: Starting OTA...
+I (xxx) esp_https_ota: Writing to <ota_1> partition at offset 0x140000
+I (xxx) esp_image: segment 0: paddr=... vaddr=... size=...
+...
+I (xxx) ota: OTA successful, restarting...
+```
+
+重启后检查启动分区：
+```
+I (482) boot: Loaded app from partition at offset 0x140000
+```
+
+- **0x140000** = ota_1 分区（从 ota_1 启动）
+- **0x10000** = ota_0 分区（从 ota_0 启动）
+
+分区会自动切换，无需手动干预。
+
+## 长期解决方案：增加 Buffer 大小
+
+如果未来需要从远程 URL 直接下载，可以修改 `main/ota/ota_manager.c` 中的 buffer：
+
+```c
+esp_http_client_config_t config = {
+    .url = url,
+    .timeout_ms = 120000,
+    .buffer_size = 16384,  // 从 4096 改为 16384
+    .crt_bundle_attach = esp_crt_bundle_attach,
+};
+```
+
+增大 buffer 的作用：
+- ✅ 容纳更多 HTTP 响应头
+- ✅ 容忍代理或网络中间件的额外头部
+- ✅ 提高不稳定网络下的可靠性
+
+但对于 GitHub releases 的国内网络问题，buffer 大小帮助不大，使用本地 HTTP 服务器仍是最稳定的方案。
+
+## 关键学习点
+
+| 问题 | 原因 | 解决 |
+|------|------|------|
+| `Out of buffer` 错误 | HTTP 连接失败（网络），不是 buffer 真的满了 | 改用本地网络（ota_server.py） |
+| GitHub 下载失败 | 国内网络限制 + 高延迟 | 本地 HTTP 服务器或代理 |
+| OTA 分区选择 | 自动在 ota_0 和 ota_1 间切换 | 启动日志中的偏移地址判断当前分区 |
+| 怎样判断启动了新固件 | 从启动日志的分区偏移地址判断 | `Loaded app from partition at offset 0x140000` |
