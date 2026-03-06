@@ -1,6 +1,6 @@
-# Tool Setup Guides
+# IM Integration Guides
 
-Configuration guides for MimiClaw's external service integrations.
+Configuration guides for MimiClaw's instant messaging channel integrations.
 
 ## Guides
 
@@ -10,7 +10,7 @@ Configuration guides for MimiClaw's external service integrations.
 
 ## Overview
 
-MimiClaw integrates with external services to extend its capabilities. Each guide below walks through obtaining API credentials, configuring MimiClaw (build-time or runtime), and verifying the integration.
+MimiClaw supports multiple IM channels for interacting with the AI agent. Each guide below walks through obtaining API credentials, configuring MimiClaw (build-time or runtime), and verifying the integration.
 
 All credentials can be set in two ways:
 
