@@ -29,14 +29,6 @@
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 
-
-/* Support both ESP32 (UART) and ESP32-S3 (USB Serial JTAG) */
-#ifdef CONFIG_IDF_TARGET_ESP32S3
-    #define CONSOLE_USE_USB_JTAG 1
-#else
-    #define CONSOLE_USE_USB_JTAG 0
-#endif
-
 static const char *TAG = "cli";
 
 /* --- wifi_set command --- */
