@@ -13,6 +13,7 @@ idf_component_register(
         "gateway/ws_server.c"
         "cli/serial_cli.c"
         "proxy/http_proxy.c"
+        "ota/ota_manager.c"
         "cron/cron_service.c"
         "heartbeat/heartbeat.c"
         "tools/tool_registry.c"

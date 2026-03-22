@@ -194,12 +194,12 @@ static const char *llm_api_url(void)
 
 static const char *llm_api_host(void)
 {
-    return provider_is_openai() ? "api.openai.com" : "api.anthropic.com";
+    return provider_is_openai() ? "open.bigmodel.cn" : "api.anthropic.com";
 }
 
 static const char *llm_api_path(void)
 {
-    return provider_is_openai() ? "/v1/chat/completions" : "/v1/messages";
+    return provider_is_openai() ? "/api/paas/v4/chat/completions" : "/v1/messages";
 }
 
 /* ── Init ─────────────────────────────────────────────────────── */

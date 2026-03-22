@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MimiClaw WebSocket Client</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #1a1a2e; color: #e0e0e0; height: 100vh; display: flex; flex-direction: column; }
+  .header { background: #16213e; padding: 12px 20px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #0f3460; }
+  .header h1 { font-size: 16px; color: #e94560; flex-shrink: 0; }
+  .header input { flex: 1; background: #0f3460; border: 1px solid #533483; color: #fff; padding: 8px 12px; border-radius: 6px; font-size: 14px; }
+  .header button { padding: 8px 20px; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; font-weight: 600; }
+  .btn-connect { background: #e94560; color: #fff; }
+  .btn-connect:hover { background: #c73a52; }
+  .btn-disconnect { background: #533483; color: #fff; }
+  .btn-disconnect:hover { background: #6b44a0; }
+  .status { font-size: 12px; padding: 4px 10px; border-radius: 10px; flex-shrink: 0; }
+  .status.connected { background: #1b5e20; color: #a5d6a7; }
+  .status.disconnected { background: #4a0000; color: #ef9a9a; }
+  .messages { flex: 1; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 8px; }
+  .msg { padding: 10px 14px; border-radius: 8px; max-width: 85%; word-wrap: break-word; font-size: 14px; line-height: 1.5; }
+  .msg pre { margin: 6px 0 0; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 4px; font-size: 13px; overflow-x: auto; white-space: pre-wrap; }
+  .msg.sent { background: #0f3460; align-self: flex-end; border-bottom-right-radius: 2px; }
+  .msg.received { background: #1a3a5c; align-self: flex-start; border-bottom-left-radius: 2px; }
+  .msg.system { background: transparent; align-self: center; color: #888; font-size: 12px; }
+  .msg .label { font-size: 11px; color: #888; margin-bottom: 4px; }
+  .msg .content-text { color: #a5d6a7; }
+  .tags { margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .tag { background: rgba(255,255,255,0.06); color: #ddd; padding: 4px 8px; border-radius: 999px; font-size: 11px; border: 1px solid rgba(255,255,255,0.03); }
+  .quick-phrases { display: flex; gap: 8px; align-items: center; margin-right: 8px; }
+  .quick-phrases button { background: transparent; border: 1px solid rgba(255,255,255,0.04); color: #fff; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size:13px; }
+  .quick-phrases button:hover { background: rgba(233,69,96,0.06); }
+  .input-area { background: #16213e; padding: 12px 20px; border-top: 1px solid #0f3460; display: flex; gap: 10px; }
+  .input-area textarea { flex: 1; background: #0f3460; border: 1px solid #533483; color: #fff; padding: 10px 14px; border-radius: 8px; font-size: 14px; font-family: inherit; resize: none; height: 44px; }
+  .input-area textarea:focus { outline: none; border-color: #e94560; }
+  .input-area button { padding: 10px 24px; background: #e94560; color: #fff; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; font-weight: 600; }
+  .input-area button:hover { background: #c73a52; }
+  .input-area button:disabled { background: #444; cursor: not-allowed; }
+</style>
+</head>
+<body>
+  <div class="header">
+    <h1>MimiClaw</h1>
+    <input type="text" id="url" value="ws://192.168.124.110:18789/" placeholder="ws://IP:PORT/">
+    <button id="connectBtn" class="btn-connect" onclick="toggleConnection()">Connect</button>
+    <span id="status" class="status disconnected">Disconnected</span>
+  </div>
+  <div class="messages" id="messages"></div>
+  <div class="input-area">
+    <div class="quick-phrases" title="常用语">
+      <button onclick="sendQuick('Hi')">Hi</button>
+      <button onclick="sendQuick('你有哪些工具')">你有哪些工具</button>
+    </div>
+    <textarea id="input" placeholder="Type a message and press Enter..." onkeydown="handleKey(event)" disabled></textarea>
+    <button id="sendBtn" onclick="sendMessage()" disabled>Send</button>
+  </div>
+
+<script>
+let ws = null;
+
+function addMsg(type, label, text, json) {
+  const div = document.createElement('div');
+  div.className = 'msg ' + type;
+  let html = '<div class="label">' + label + '</div>';
+  if (json) {
+    try {
+      const obj = JSON.parse(text);
+      const content = obj.content || '';
+      const meta = Object.assign({}, obj);
+      delete meta.content;
+      html += '<div class="content-text">' + escHtml(content) + '</div>';
+      if (Object.keys(meta).length > 0) {
+        html += '<div class="tags">';
+        Object.keys(meta).forEach(k => {
+          let v = meta[k];
+          try { v = typeof v === 'object' ? JSON.stringify(v) : String(v); } catch(e) { v = String(v); }
+          html += '<span class="tag">' + escHtml(k + ': ' + v) + '</span>';
+        });
+        html += '</div>';
+      }
+    } catch(e) {
+      html += '<pre>' + escHtml(text) + '</pre>';
+    }
+  } else {
+    html += escHtml(text);
+  }
+  div.innerHTML = html;
+  const msgs = document.getElementById('messages');
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function toggleConnection() {
+  if (ws && ws.readyState <= 1) { ws.close(); return; }
+  const url = document.getElementById('url').value;
+  ws = new WebSocket(url);
+  ws.onopen = () => {
+    document.getElementById('status').textContent = 'Connected';
+    document.getElementById('status').className = 'status connected';
+    document.getElementById('connectBtn').textContent = 'Disconnect';
+    document.getElementById('connectBtn').className = 'header button btn-disconnect';
+    document.getElementById('input').disabled = false;
+    document.getElementById('sendBtn').disabled = false;
+    addMsg('system', '', 'Connected to ' + url);
+  };
+  ws.onmessage = (e) => {
+    const now = new Date().toLocaleTimeString();
+    addMsg('received', 'Received ' + now, e.data, true);
+  };
+  ws.onclose = () => {
+    document.getElementById('status').textContent = 'Disconnected';
+    document.getElementById('status').className = 'status disconnected';
+    document.getElementById('connectBtn').textContent = 'Connect';
+    document.getElementById('connectBtn').className = 'header button btn-connect';
+    document.getElementById('input').disabled = true;
+    document.getElementById('sendBtn').disabled = true;
+    addMsg('system', '', 'Disconnected');
+  };
+  ws.onerror = () => addMsg('system', '', 'Connection error');
+}
+
+function sendMessage() {
+  const input = document.getElementById('input');
+  const text = input.value.trim();
+  if (!text || !ws || ws.readyState !== 1) return;
+
+  let payload = text;
+  try { JSON.parse(text); } catch(e) {
+    payload = JSON.stringify({ type: 'message', content: text });
+  }
+
+  ws.send(payload);
+  const now = new Date().toLocaleTimeString();
+  addMsg('sent', 'Sent ' + now, payload, true);
+  input.value = '';
+}
+
+function sendQuick(text) {
+  if (!text || !ws || ws.readyState !== 1) return;
+  let payload = text;
+  try { JSON.parse(text); } catch(e) {
+    payload = JSON.stringify({ type: 'message', content: text });
+  }
+  ws.send(payload);
+  const now = new Date().toLocaleTimeString();
+  addMsg('sent', 'Sent ' + now, payload, true);
+  const input = document.getElementById('input');
+  input.value = '';
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+}
+</script>
+</body>
+</html>

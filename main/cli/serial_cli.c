@@ -9,6 +9,7 @@
 #include "proxy/http_proxy.h"
 #include "tools/tool_registry.h"
 #include "tools/tool_web_search.h"
+#include "ota/ota_manager.h"
 #include "cron/cron_service.h"
 #include "heartbeat/heartbeat.h"
 #include "skills/skill_loader.h"
@@ -776,6 +777,30 @@ static int cmd_restart(int argc, char **argv)
     return 0;  /* unreachable */
 }
 
+/* --- ota_update command --- */
+static struct {
+    struct arg_str *url;
+    struct arg_end *end;
+} ota_update_args;
+
+static int cmd_ota_update(int argc, char **argv)
+{
+    int nerrors = arg_parse(argc, argv, (void **)&ota_update_args);
+    if (nerrors != 0) {
+        arg_print_errors(stderr, ota_update_args.end, argv[0]);
+        return 1;
+    }
+
+    const char *url = ota_update_args.url->sval[0];
+    printf("Downloading firmware from: %s\n", url);
+
+    esp_err_t ret = ota_update_from_url(url);
+    if (ret != ESP_OK) {
+        printf("OTA update failed: %s\n", esp_err_to_name(ret));
+    }
+    return (ret == ESP_OK) ? 0 : 1;
+}
+
 esp_err_t serial_cli_init(void)
 {
     esp_console_repl_t *repl = NULL;
@@ -1031,6 +1056,18 @@ esp_err_t serial_cli_init(void)
         .func = &cmd_config_reset,
     };
     esp_console_cmd_register(&config_reset_cmd);
+
+    /* ota_update */
+    ota_update_args.url = arg_str1(NULL, NULL, "<url>", "Firmware .bin URL");
+    ota_update_args.end = arg_end(1);
+    esp_console_cmd_t ota_update_cmd = {
+        .command = "ota_update",
+        .help = "Download and flash firmware from URL",
+        .func = &cmd_ota_update,
+        .argtable = &ota_update_args,
+    };
+    esp_console_cmd_register(&ota_update_cmd);
+
 
     /* heartbeat_trigger */
     esp_console_cmd_t heartbeat_cmd = {
