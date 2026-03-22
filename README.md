@@ -1,14 +1,18 @@
 # MimiClaw: Pocket AI Assistant on a $5 Chip
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![DeepWiki](https://img.shields.io/badge/DeepWiki-mimiclaw-blue.svg)](https://deepwiki.com/memovai/mimiclaw)
-[![Discord](https://img.shields.io/badge/Discord-mimiclaw-5865F2?logo=discord&logoColor=white)](https://discord.gg/r8ZxSvB8Yr)
-[![X](https://img.shields.io/badge/X-@ssslvky-black?logo=x)](https://x.com/ssslvky)
-
-**[English](README.md) | [中文](README_CN.md) | [日本語](README_JA.md)**
+<p align="center">
+  <img src="assets/banner.png" alt="MimiClaw" width="500" />
+</p>
 
 <p align="center">
-  <img src="assets/banner.png" alt="MimiClaw" width="480" />
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
+  <a href="https://deepwiki.com/memovai/mimiclaw"><img src="https://img.shields.io/badge/DeepWiki-mimiclaw-blue.svg" alt="DeepWiki"></a>
+  <a href="https://discord.gg/r8ZxSvB8Yr"><img src="https://img.shields.io/badge/Discord-mimiclaw-5865F2?logo=discord&logoColor=white" alt="Discord"></a>
+  <a href="https://x.com/ssslvky"><img src="https://img.shields.io/badge/X-@ssslvky-black?logo=x" alt="X"></a>
+</p>
+
+<p align="center">
+  <strong><a href="README.md">English</a> | <a href="README_CN.md">中文</a> | <a href="README_JA.md">日本語</a></strong>
 </p>
 
 **The world's first AI assistant(OpenClaw) on a $5 chip. No Linux. No Node.js. Just pure C**
@@ -50,6 +54,65 @@ cd mimiclaw
 idf.py set-target esp32s3
 ```
 
+<details>
+<summary>Ubuntu Install</summary>
+
+Recommended baseline:
+
+- Ubuntu 22.04/24.04
+- Python >= 3.10
+- CMake >= 3.16
+- Ninja >= 1.10
+- Git >= 2.34
+- flex >= 2.6
+- bison >= 3.8
+- gperf >= 3.1
+- dfu-util >= 0.11
+- `libusb-1.0-0`, `libffi-dev`, `libssl-dev`
+
+Install and build on Ubuntu:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y git wget flex bison gperf python3 python3-pip python3-venv \
+  cmake ninja-build ccache libffi-dev libssl-dev dfu-util libusb-1.0-0
+
+./scripts/setup_idf_ubuntu.sh
+./scripts/build_ubuntu.sh
+```
+
+</details>
+
+<details>
+<summary>macOS Install</summary>
+
+Recommended baseline:
+
+- macOS 12/13/14
+- Xcode Command Line Tools
+- Homebrew
+- Python >= 3.10
+- CMake >= 3.16
+- Ninja >= 1.10
+- Git >= 2.34
+- flex >= 2.6
+- bison >= 3.8
+- gperf >= 3.1
+- dfu-util >= 0.11
+- `libusb`, `libffi`, `openssl`
+
+Install and build on macOS:
+
+```bash
+xcode-select --install
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+./scripts/setup_idf_macos.sh
+./scripts/build_macos.sh
+```
+
+</details>
+
 ### Configure
 
 MimiClaw uses a **two-layer config** system: build-time defaults in `mimi_secrets.h`, with runtime overrides via the serial CLI. CLI values are stored in NVS flash and take priority over build-time values.
@@ -67,6 +130,7 @@ Edit `main/mimi_secrets.h`:
 #define MIMI_SECRET_API_KEY         "sk-ant-api03-xxxxx"
 #define MIMI_SECRET_MODEL_PROVIDER  "anthropic"     // "anthropic" or "openai"
 #define MIMI_SECRET_SEARCH_KEY      ""              // optional: Brave Search API key
+#define MIMI_SECRET_TAVILY_KEY      ""              // optional: Tavily API key (preferred)
 #define MIMI_SECRET_PROXY_HOST      ""              // optional: e.g. "10.0.0.1"
 #define MIMI_SECRET_PROXY_PORT      ""              // optional: e.g. "7897"
 ```
@@ -95,7 +159,7 @@ idf.py -p PORT flash monitor
 >
 > </details>
 
-### CLI Commands
+### CLI Commands (via UART/COM port)
 
 Connect via serial to configure or debug. **Config commands** let you change settings without recompiling — just plug in a USB cable anywhere.
 
@@ -110,6 +174,7 @@ mimi> set_model gpt-4o             # change LLM model
 mimi> set_proxy 127.0.0.1 7897  # set HTTP proxy
 mimi> clear_proxy                  # remove proxy
 mimi> set_search_key BSA...        # set Brave Search API key
+mimi> set_tavily_key tvly-...      # set Tavily API key (preferred)
 mimi> config_show                  # show all config (masked)
 mimi> config_reset                 # clear NVS, revert to build-time defaults
 ```
@@ -123,8 +188,51 @@ mimi> memory_write "content"   # write to MEMORY.md
 mimi> heap_info                # how much RAM is free?
 mimi> session_list             # list all chat sessions
 mimi> session_clear 12345      # wipe a conversation
-mimi> restart                  # reboot
+mimi> heartbeat_trigger           # manually trigger a heartbeat check
+mimi> cron_start                  # start cron scheduler now
+mimi> restart                     # reboot
 ```
+
+### USB (JTAG) vs UART: Which Port for What
+
+Most ESP32-S3 dev boards expose **two USB-C ports**:
+
+| Port | Use for |
+|------|---------|
+| **USB** (JTAG) | `idf.py flash`, JTAG debugging |
+| **COM** (UART) | **REPL CLI**, serial console |
+
+> **REPL requires the UART (COM) port.** The USB (JTAG) port does not support interactive REPL input.
+
+<details>
+<summary>Port details & recommended workflow</summary>
+
+| Port | Label | Protocol |
+|------|-------|----------|
+| **USB** | USB / JTAG | Native USB Serial/JTAG |
+| **COM** | UART / COM | External UART bridge (CP2102/CH340) |
+
+The ESP-IDF console/REPL is configured to use UART by default (`CONFIG_ESP_CONSOLE_UART_DEFAULT=y`).
+
+**If you have both ports connected simultaneously:**
+
+- USB (JTAG) handles flash/download and provides secondary serial output
+- UART (COM) provides the primary interactive console for the REPL
+- macOS: both appear as `/dev/cu.usbmodem*` or `/dev/cu.usbserial-*` — run `ls /dev/cu.usb*` to identify
+- Linux: USB (JTAG) → `/dev/ttyACM0`, UART → `/dev/ttyUSB0`
+
+**Recommended workflow:**
+
+```bash
+# Flash via USB (JTAG) port
+idf.py -p /dev/cu.usbmodem11401 flash
+
+# Open REPL via UART (COM) port
+idf.py -p /dev/cu.usbserial-110 monitor
+# or use any serial terminal: screen, minicom, PuTTY at 115200 baud
+```
+
+</details>
 
 ## Memory
 
@@ -135,6 +243,8 @@ MimiClaw stores everything as plain text files you can read and edit:
 | `SOUL.md` | The bot's personality — edit this to change how it behaves |
 | `USER.md` | Info about you — name, preferences, language |
 | `MEMORY.md` | Long-term memory — things the bot should always remember |
+| `HEARTBEAT.md` | Task list the bot checks periodically and acts on autonomously |
+| `cron.json` | Scheduled jobs — recurring or one-shot tasks created by the AI |
 | `2026-02-05.md` | Daily notes — what happened today |
 | `tg_12345.jsonl` | Chat history — your conversation with the bot |
 
@@ -144,10 +254,25 @@ MimiClaw supports tool calling for both Anthropic and OpenAI — the LLM can cal
 
 | Tool | Description |
 |------|-------------|
-| `web_search` | Search the web via Brave Search API for current information |
+| `web_search` | Search the web via Tavily (preferred) or Brave for current information |
 | `get_current_time` | Fetch current date/time via HTTP and set the system clock |
+| `cron_add` | Schedule a recurring or one-shot task (the LLM creates cron jobs on its own) |
+| `cron_list` | List all scheduled cron jobs |
+| `cron_remove` | Remove a cron job by ID |
 
-To enable web search, set a [Brave Search API key](https://brave.com/search/api/) via `MIMI_SECRET_SEARCH_KEY` in `mimi_secrets.h`.
+To enable web search, set a [Tavily API key](https://app.tavily.com/home) via `MIMI_SECRET_TAVILY_KEY` (preferred), or a [Brave Search API key](https://brave.com/search/api/) via `MIMI_SECRET_SEARCH_KEY` in `mimi_secrets.h`.
+
+## Cron Tasks
+
+MimiClaw has a built-in cron scheduler that lets the AI schedule its own tasks. The LLM can create recurring jobs ("every N seconds") or one-shot jobs ("at unix timestamp") via the `cron_add` tool. When a job fires, its message is injected into the agent loop — so the AI wakes up, processes the task, and responds.
+
+Jobs are persisted to SPIFFS (`cron.json`) and survive reboots. Example use cases: daily summaries, periodic reminders, scheduled check-ins.
+
+## Heartbeat
+
+The heartbeat service periodically reads `HEARTBEAT.md` from SPIFFS and checks for actionable tasks. If uncompleted items are found (anything that isn't an empty line, a header, or a checked `- [x]` box), it sends a prompt to the agent loop so the AI can act on them autonomously.
+
+This turns MimiClaw into a proactive assistant — write tasks to `HEARTBEAT.md` and the bot will pick them up on the next heartbeat cycle (default: every 30 minutes).
 
 ## Also Included
 
@@ -156,6 +281,8 @@ To enable web search, set a [Brave Search API key](https://brave.com/search/api/
 - **Dual-core** — network I/O and AI processing run on separate CPU cores
 - **HTTP proxy** — CONNECT tunnel support for restricted networks
 - **Multi-provider** — supports both Anthropic (Claude) and OpenAI (GPT), switchable at runtime
+- **Cron scheduler** — the AI can schedule its own recurring and one-shot tasks, persisted across reboots
+- **Heartbeat** — periodically checks a task file and prompts the AI to act autonomously
 - **Tool use** — ReAct agent loop with tool calling for both providers
 
 ## For Developers
@@ -164,6 +291,20 @@ Technical details live in the `docs/` folder:
 
 - **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — system design, module map, task layout, memory budget, protocols, flash partitions
 - **[docs/TODO.md](docs/TODO.md)** — feature gap tracker and roadmap
+- **[docs/WIFI_ONBOARDING_AP.md](docs/WIFI_ONBOARDING_AP.md)** — how the local `MimiClaw-XXXX` onboarding/admin AP flow works
+- **[docs/tool-setup/](docs/tool-setup/README.md)** — configuration guides for external service integrations (Tavily, etc.)
+
+## Contributing
+
+Please read **[CONTRIBUTING.md](CONTRIBUTING.md)** before opening issues or pull requests.
+
+## Contributors
+
+Thanks to everyone who has contributed to MimiClaw.
+
+<a href="https://github.com/memovai/mimiclaw/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=memovai/mimiclaw" alt="MimiClaw contributors" />
+</a>
 
 ## License
 
@@ -175,4 +316,10 @@ Inspired by [OpenClaw](https://github.com/openclaw/openclaw) and [Nanobot](https
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=memovai/mimiclaw&type=Date)](https://star-history.com/#memovai/mimiclaw&Date)
+<a href="https://www.star-history.com/?repos=memovai%2Fmimiclaw&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=memovai/mimiclaw&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=memovai/mimiclaw&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/image?repos=memovai/mimiclaw&type=date&legend=top-left" />
+ </picture>
+</a>

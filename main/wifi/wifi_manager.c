@@ -15,6 +15,7 @@ static EventGroupHandle_t s_wifi_event_group;
 static int s_retry_count = 0;
 static char s_ip_str[16] = "0.0.0.0";
 static bool s_connected = false;
+static bool s_reconnect_enabled = true;
 
 static const char *wifi_reason_to_str(wifi_err_reason_t reason)
 {
@@ -44,7 +45,7 @@ static void event_handler(void *arg, esp_event_base_t event_base,
         if (disc) {
             ESP_LOGW(TAG, "Disconnected (reason=%d:%s)", disc->reason, wifi_reason_to_str(disc->reason));
         }
-        if (s_retry_count < MIMI_WIFI_MAX_RETRY) {
+        if (s_reconnect_enabled && s_retry_count < MIMI_WIFI_MAX_RETRY) {
             /* Exponential backoff: 1s, 2s, 4s, 8s, ... capped at 30s */
             uint32_t delay_ms = MIMI_WIFI_RETRY_BASE_MS << s_retry_count;
             if (delay_ms > MIMI_WIFI_RETRY_MAX_MS) {
@@ -85,8 +86,6 @@ esp_err_t wifi_manager_init(void)
     ESP_ERROR_CHECK(esp_event_handler_instance_register(
         IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL, NULL));
 
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-
     ESP_LOGI(TAG, "WiFi manager initialized");
     return ESP_OK;
 }
@@ -122,8 +121,10 @@ esp_err_t wifi_manager_start(void)
         return ESP_ERR_NOT_FOUND;
     }
 
+    s_reconnect_enabled = true;
     ESP_LOGI(TAG, "Connecting to SSID: %s", wifi_cfg.sta.ssid);
 
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_cfg));
     ESP_ERROR_CHECK(esp_wifi_start());
 
@@ -231,4 +232,42 @@ void wifi_manager_scan_and_print(void)
 
     free(ap_list);
     esp_wifi_connect();
+}
+
+bool wifi_manager_has_credentials(void)
+{
+    /* Check NVS first */
+    nvs_handle_t nvs;
+    if (nvs_open(MIMI_NVS_WIFI, NVS_READONLY, &nvs) == ESP_OK) {
+        char ssid[33] = {0};
+        size_t len = sizeof(ssid);
+        esp_err_t err = nvs_get_str(nvs, MIMI_NVS_KEY_SSID, ssid, &len);
+        nvs_close(nvs);
+        if (err == ESP_OK && ssid[0] != '\0') return true;
+    }
+
+    /* Fall back to build-time secrets */
+    if (MIMI_SECRET_WIFI_SSID[0] != '\0') return true;
+
+    return false;
+}
+
+esp_err_t wifi_manager_stop(void)
+{
+    s_reconnect_enabled = false;
+    esp_wifi_disconnect();
+    esp_wifi_stop();
+    s_connected = false;
+    s_retry_count = 0;
+    xEventGroupClearBits(s_wifi_event_group, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT);
+    ESP_LOGI(TAG, "WiFi stopped");
+    return ESP_OK;
+}
+
+void wifi_manager_set_reconnect_enabled(bool enabled)
+{
+    s_reconnect_enabled = enabled;
+    if (!enabled) {
+        s_retry_count = 0;
+    }
 }

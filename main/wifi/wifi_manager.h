@@ -49,3 +49,18 @@ EventGroupHandle_t wifi_manager_get_event_group(void);
  * Scan and print nearby APs.
  */
 void wifi_manager_scan_and_print(void);
+
+/**
+ * Check if WiFi credentials exist (NVS or build-time secrets).
+ */
+bool wifi_manager_has_credentials(void);
+
+/**
+ * Stop WiFi (for mode switching during onboarding).
+ */
+esp_err_t wifi_manager_stop(void);
+
+/**
+ * Enable or disable STA auto-reconnect on disconnect events.
+ */
+void wifi_manager_set_reconnect_enabled(bool enabled);
