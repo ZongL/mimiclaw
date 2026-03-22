@@ -53,7 +53,7 @@ jobs:
             ${{ matrix.target.partition_offset }}  build/partition_table/partition-table.bin \
             ${{ matrix.target.otainitial_offset }}  build/ota_data_initial.bin \
             ${{ matrix.target.appbin_offset }} build/mimiclaw.bin \
-            0x270000 build/spiffs.bin
+            0x2D0000 build/spiffs.bin
 
           # Copy individual binaries with version suffix
           cp build/mimiclaw.bin              "mimiclaw-${TARGET}-${VERSION}.bin"
@@ -102,7 +102,7 @@ jobs:
               0x8000  partition-table-esp32cam-${{ github.ref_name }}.bin \
               0xe000  ota_data_initial-esp32cam-${{ github.ref_name }}.bin \
               0x10000 mimiclaw-esp32cam-${{ github.ref_name }}.bin \
-              0x270000 spiffs-esp32cam-${{ github.ref_name }}.bin
+              0x2D0000 spiffs-esp32cam-${{ github.ref_name }}.bin
             ```
 
             ---
