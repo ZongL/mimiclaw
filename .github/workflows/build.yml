@@ -16,10 +16,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build firmware (ESP32-S3)
+      - name: Build firmware (ESP32)
         shell: bash
         run: |
           . "$IDF_PATH/export.sh"
-          idf.py set-target esp32s3
+          idf.py set-target esp32
           idf.py fullclean
           idf.py build

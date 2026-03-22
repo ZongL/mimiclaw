@@ -43,7 +43,7 @@ jobs:
           VERSION="${GITHUB_REF_NAME}"
           TARGET="${{ matrix.target.name }}"
 
-          # Generate merged firmware for single-command flashing
+          # Generate merged firmware for single-command flashing (includes SPIFFS)
           esptool.py --chip ${{ matrix.target.chip }} merge_bin \
             --flash_mode ${{ matrix.target.flash_mode }} \
             --flash_size ${{ matrix.target.flash_size }} \
@@ -52,13 +52,15 @@ jobs:
             ${{ matrix.target.bootloader_offset }}     build/bootloader/bootloader.bin \
             ${{ matrix.target.partition_offset }}  build/partition_table/partition-table.bin \
             ${{ matrix.target.otainitial_offset }}  build/ota_data_initial.bin \
-            ${{ matrix.target.appbin_offset }} build/mimiclaw.bin
+            ${{ matrix.target.appbin_offset }} build/mimiclaw.bin \
+            0x270000 build/spiffs.bin
 
           # Copy individual binaries with version suffix
           cp build/mimiclaw.bin              "mimiclaw-${TARGET}-${VERSION}.bin"
           cp build/bootloader/bootloader.bin "bootloader-${TARGET}-${VERSION}.bin"
           cp build/partition_table/partition-table.bin "partition-table-${TARGET}-${VERSION}.bin"
           cp build/ota_data_initial.bin      "ota_data_initial-${TARGET}-${VERSION}.bin"
+          cp build/spiffs.bin                "spiffs-${TARGET}-${VERSION}.bin"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -70,6 +72,7 @@ jobs:
             bootloader-${{ matrix.target.name }}-${{ github.ref_name }}.bin
             partition-table-${{ matrix.target.name }}-${{ github.ref_name }}.bin
             ota_data_initial-${{ matrix.target.name }}-${{ github.ref_name }}.bin
+            spiffs-${{ matrix.target.name }}-${{ github.ref_name }}.bin
           retention-days: 90
 
       - name: Create Release
@@ -98,7 +101,8 @@ jobs:
               0x1000     bootloader-esp32cam-${{ github.ref_name }}.bin \
               0x8000  partition-table-esp32cam-${{ github.ref_name }}.bin \
               0xe000  ota_data_initial-esp32cam-${{ github.ref_name }}.bin \
-              0x10000 mimiclaw-esp32cam-${{ github.ref_name }}.bin
+              0x10000 mimiclaw-esp32cam-${{ github.ref_name }}.bin \
+              0x270000 spiffs-esp32cam-${{ github.ref_name }}.bin
             ```
 
             ---
@@ -124,3 +128,4 @@ jobs:
             bootloader-esp32cam-${{ github.ref_name }}.bin
             partition-table-esp32cam-${{ github.ref_name }}.bin
             ota_data_initial-esp32cam-${{ github.ref_name }}.bin
+            spiffs-esp32cam-${{ github.ref_name }}.bin
