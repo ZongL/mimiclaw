@@ -958,3 +958,90 @@ esp_http_client_config_t config = {
 | GitHub 下载失败 | 国内网络限制 + 高延迟 | 本地 HTTP 服务器或代理 |
 | OTA 分区选择 | 自动在 ota_0 和 ota_1 间切换 | 启动日志中的偏移地址判断当前分区 |
 | 怎样判断启动了新固件 | 从启动日志的分区偏移地址判断 | `Loaded app from partition at offset 0x140000` |
+
+---
+
+# ESP32-CAM GPIO 控制配置说明
+
+## 当前配置状态
+
+当前项目默认的 GPIO 配置在 `main/tools/gpio_policy.h` 中：
+
+```c
+#define MIMI_GPIO_MIN_PIN       1
+#define MIMI_GPIO_MAX_PIN       21
+#define MIMI_GPIO_ALLOWED_CSV   "1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,21,38,46"
+```
+
+**该配置是针对 ESP32-S3-LCD-1.47B 开发板的，不适用于 ESP32-CAM！**
+
+## ESP32-CAM 的 GPIO 限制
+
+| 引脚 | 用途 | 能否作为 GPIO |
+|------|------|--------------|
+| GPIO 0 | 启动模式选择 | ⚠️ 需谨慎（拉低启动）|
+| GPIO 1, 3 | UART0 (调试串口) | ❌ 不推荐 |
+| GPIO 2 | 启动/LED | ⚠️ 需谨慎 |
+| GPIO 4, 5 | I2C (摄像头) | ❌ 摄像头使用 |
+| GPIO 6-11 | Flash/PSRAM | ❌ 不可用 |
+| GPIO 12-15 | PSRAM 控制 | ⚠️ 需看PSRAM配置 |
+| GPIO 16, 17 | PSRAM 数据 | ⚠️ 需看PSRAM配置 |
+| GPIO 32-39 | 摄像头数据 | ❌ 摄像头使用 |
+
+## ESP32-CAM 推荐的 GPIO 配置
+
+### 使用 PSRAM（默认情况）
+
+相对安全的可用引脚：
+- **GPIO 0** - 启动引脚，上拉可用
+- **GPIO 12, 13, 14, 15** - PSRAM 控制线（可能可用）
+
+建议配置：
+```c
+#define MIMI_GPIO_ALLOWED_CSV   "0,12,13,14,15"
+```
+
+### 不使用 PSRAM
+
+更多引脚可用：
+- **GPIO 0, 12, 13, 14, 15, 16, 17** - 都可能可用
+
+建议配置：
+```c
+#define MIMI_GPIO_ALLOWED_CSV   "0,12,13,14,15,16,17"
+```
+
+## 如何修改配置
+
+编辑 `main/tools/gpio_policy.h`，修改 `MIMI_GPIO_ALLOWED_CSV` 宏定义：
+
+```c
+// 对于使用 PSRAM 的 ESP32-CAM
+#define MIMI_GPIO_ALLOWED_CSV   "0,12,13,14,15"
+
+// 对于不使用 PSRAM 的 ESP32-CAM
+#define MIMI_GPIO_ALLOWED_CSV   "0,12,13,14,15,16,17"
+```
+
+修改后需要重新编译固件：
+```bash
+idf.py build
+idf.py flash
+```
+
+## GPIO 代码位置
+
+- GPIO 策略定义：`main/tools/gpio_policy.h` 和 `.c`
+- GPIO 工具实现：`main/tools/tool_gpio.c` 和 `.h`
+- GPIO 注册：`main/tools/tool_registry.c`
+
+## 常见问题
+
+**Q: 为什么 GPIO 0 比较特殊？**
+A: GPIO 0 是 ESP32 的启动模式选择引脚。上电时如果 GPIO 0 为低电平，芯片会进入下载模式而不是正常启动。使用时要确保该引脚默认为高电平。
+
+**Q: 如何知道我的板子是否使用 PSRAM？**
+A: 查看启动日志，如果有类似 `esp_psram: Found 4MB PSRAM device` 的输出，说明启用了 PSRAM。
+
+**Q: 误操作了被占用的引脚会怎样？**
+A: 可能导致摄像头无法工作、串口通信异常或系统启动失败。修改配置前请确认引脚的实际用途。
