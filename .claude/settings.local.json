@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /d/11_web/mimiclaw -maxdepth 2 -type f \\\\\\(-name *.sh -o -name sdkconfig* \\\\\\))",
+      "Bash(xargs ls:*)",
+      "Bash(find /d/11_web/mimiclaw/docs -type f -name *.md)"
+    ]
+  }
+}
